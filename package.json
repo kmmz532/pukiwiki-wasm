@@ -1,0 +1,26 @@
+{
+  "name": "pukiwiki-wasm",
+  "version": "1.0.0",
+  "description": "PukiWiki on php-wasm",
+  "private": "true",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "predev": "node scripts/generate-manifest.mjs",
+    "prebuild": "node scripts/generate-manifest.mjs",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "kmmz1127",
+  "license": "GPL-3.0-or-later",
+  "dependencies": {
+    "php-cgi-wasm": "^0.2.0",
+    "php-wasm": "^0.2.0",
+    "php-wasm-mbstring": "^0.2.0",
+    "quickbus": "^1.0.2"
+  },
+  "devDependencies": {
+    "vite": "^8.3.5"
+  }
+}

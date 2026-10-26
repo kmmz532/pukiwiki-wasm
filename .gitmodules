@@ -1,0 +1,3 @@
+[submodule "public/pukiwiki"]
+	path = public/pukiwiki
+	url = https://github.com/pukiwiki/pukiwiki.git
