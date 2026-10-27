@@ -5,6 +5,11 @@ const APP_BASE = new URL(BASE_URL, window.location.href);
 
 const DOCUMENT_ROOT = "/persist/www";
 const MARKER = `${DOCUMENT_ROOT}/.pukiwiki-wasm-installed`;
+const progress = document.getElementById("progress");
+
+function setProgress(percent) {
+  if (progress) progress.textContent = `${Math.floor(percent)}%`;
+}
 
 async function ensureDirectory(bus, directory) {
   const parts = directory.split("/").filter(Boolean);
@@ -58,6 +63,8 @@ function getConcurrency() {
 }
 
 async function installPukiWiki(bus) {
+  setProgress(1);
+
   const manifestUrl = new URL("pukiwiki-manifest.json", APP_BASE);
   const manifestResponse = await fetch(manifestUrl);
 
@@ -75,43 +82,60 @@ async function installPukiWiki(bus) {
     await ensureDirectory(bus, `${DOCUMENT_ROOT}/${directory}`);
   }
 
-  const concurrency = getConcurrency();
   let nextIndex = 0;
   let completed = 0;
+
+  const concurrency = getConcurrency();
   const downloadedFiles = new Array(manifest.files.length);
+  const totalFiles = manifest.files.length;
+
+  setProgress(5);
 
   const getNextIndex = () => nextIndex++;
 
   const onComplete = () => {
     completed++;
-    if (completed % 25 === 0 || completed === manifest.files.length)
-      console.log(`[pukiwiki-wasm] Downloaded ${completed}/${manifest.files.length} files`);
+
+    setProgress(5 + (completed / totalFiles) * 75);
+
+    if (completed % 25 === 0 || completed === totalFiles)
+      console.log(`[pukiwiki-wasm] Downloaded ${completed}/${totalFiles} files`);
   };
 
-  await Promise.all(Array.from({ length: Math.min(concurrency, manifest.files.length) }, 
-    () => downloadWorker(manifest, downloadedFiles, getNextIndex, onComplete)));
+  await Promise.all(Array.from({ length: Math.min(concurrency, totalFiles) }, () => downloadWorker(manifest, downloadedFiles, getNextIndex, onComplete)));
+
+  let written = 0;
 
   for (const { file, bytes } of downloadedFiles) {
     await bus.writeFile(`${DOCUMENT_ROOT}/${file}`, bytes);
+    written++;
+
+    setProgress(80 + (written / totalFiles) * 19);
   }
 
   await bus.writeFile(MARKER, "installed");
+  setProgress(100);
 
-  console.log(`[pukiwiki-wasm] Installed ${manifest.files.length} files`);
+  console.log(`[pukiwiki-wasm] Installed ${totalFiles} files`);
 }
 
 async function main() {
-if (window.location.pathname !== APP_BASE.pathname) return;
+  if (window.location.pathname !== APP_BASE.pathname) return;
+
+  setProgress(0);
 
   if (!("serviceWorker" in navigator))
     throw new Error("This browser does not support Service Workers.");
 
   const workerFile = (import.meta.env.DEV ? "src/" : "") + "cgi-worker.js";
   const workerUrl = new URL(workerFile, APP_BASE);
+
   const registration = await navigator.serviceWorker.register(workerUrl, {
     type: "module",
     scope: APP_BASE.pathname,
   });
+
+  setProgress(1);
 
   await navigator.serviceWorker.ready;
 
