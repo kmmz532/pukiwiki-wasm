@@ -30,6 +30,33 @@ async function isInstalled(bus) {
   }
 }
 
+async function downloadWorker(manifest, downloadedFiles, getNextIndex, onComplete) {
+  while (true) {
+    const index = getNextIndex();
+
+    if (index >= manifest.files.length) return;
+
+    const file = manifest.files[index];
+    const encodedPath = file.split("/").map(encodeURIComponent).join("/");
+    const response = await fetch(new URL(`pukiwiki/${encodedPath}`, APP_BASE));
+
+    if (!response.ok)
+      throw new Error(`Failed to fetch file: ${file} (HTTP ${response.status})`);
+
+    downloadedFiles[index] = {
+      file,
+      bytes: new Uint8Array(await response.arrayBuffer()),
+    };
+
+    onComplete();
+  }
+}
+
+function getConcurrency() {
+  const cores = navigator.hardwareConcurrency || 4;
+  return Math.max(4, Math.min(16, cores * 2));
+}
+
 async function installPukiWiki(bus) {
   const manifestUrl = new URL("pukiwiki-manifest.json", APP_BASE);
   const manifestResponse = await fetch(manifestUrl);
@@ -48,19 +75,29 @@ async function installPukiWiki(bus) {
     await ensureDirectory(bus, `${DOCUMENT_ROOT}/${directory}`);
   }
 
-  for (const file of manifest.files) {
-    const encodedPath = file.split("/").map(encodeURIComponent).join("/");
-    const sourceUrl = new URL(`pukiwiki/${encodedPath}`, APP_BASE);
-    const response = await fetch(sourceUrl);
+  const concurrency = getConcurrency();
+  let nextIndex = 0;
+  let completed = 0;
+  const downloadedFiles = new Array(manifest.files.length);
 
-    if (!response.ok)
-      throw new Error(`Failed to fetch file: ${file} (HTTP ${response.status})`);
+  const getNextIndex = () => nextIndex++;
 
-    const bytes = new Uint8Array(await response.arrayBuffer());
+  const onComplete = () => {
+    completed++;
+    if (completed % 25 === 0 || completed === manifest.files.length)
+      console.log(`[pukiwiki-wasm] Downloaded ${completed}/${manifest.files.length} files`);
+  };
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, manifest.files.length) }, 
+    () => downloadWorker(manifest, downloadedFiles, getNextIndex, onComplete)));
+
+  for (const { file, bytes } of downloadedFiles) {
     await bus.writeFile(`${DOCUMENT_ROOT}/${file}`, bytes);
   }
 
   await bus.writeFile(MARKER, "installed");
+
+  console.log(`[pukiwiki-wasm] Installed ${manifest.files.length} files`);
 }
 
 async function main() {
