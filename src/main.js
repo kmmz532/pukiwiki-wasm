@@ -101,6 +101,8 @@ async function installPukiWiki(bus) {
 }
 
 async function main() {
+if (window.location.pathname !== APP_BASE.pathname) return;
+
   if (!("serviceWorker" in navigator))
     throw new Error("This browser does not support Service Workers.");
 

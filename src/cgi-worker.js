@@ -46,6 +46,7 @@ const php = new PhpCgiWorker({
     `${BASE_PATH}pukiwiki`,
     `${BASE_PATH}pukiwiki-manifest.json`,
     `${BASE_PATH}cgi-worker.js`,
+    `${BASE_PATH}settings`,
   ],
 
   rewrite(path) {
